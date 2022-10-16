@@ -1,0 +1,10 @@
+/home/administrator/Documents/code/contracts/contract/target/debug/deps/secp256k1-5f150e6a930bccf0.rmeta: /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/lib.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/macros.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/constants.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/ecdh.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/ffi.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/key.rs
+
+/home/administrator/Documents/code/contracts/contract/target/debug/deps/secp256k1-5f150e6a930bccf0.d: /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/lib.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/macros.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/constants.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/ecdh.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/ffi.rs /home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/key.rs
+
+/home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/lib.rs:
+/home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/macros.rs:
+/home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/constants.rs:
+/home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/ecdh.rs:
+/home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/ffi.rs:
+/home/administrator/.cargo/registry/src/github.com-1ecc6299db9ec823/parity-secp256k1-0.7.0/src/key.rs:
