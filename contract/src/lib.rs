@@ -7,11 +7,7 @@
  */
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{
-  log, 
-  near_bindgen, 
-  Promise, 
-};
+use near_sdk::near_bindgen;
 
 use near_sdk::env::panic_str; 
 
@@ -32,7 +28,7 @@ impl Pricing for SimpleRent {
   fn get_price(&self, from: i64, until:i64) -> i128 {
     return ((until - from) as i128) * self.price_per_ms; 
   }
-  fn get_refund(&self, from: i64, until:i64, now: i64) -> i128 {
+  fn get_refund(&self, from: i64, until:i64, _now: i64) -> i128 {
     return ((until - from) as i128) * self.price_per_ms; 
   }
 }
@@ -48,14 +44,16 @@ pub struct Resource {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Contract {
-  resources: LookupMap<String, Resource>
+  resources: LookupMap<String, Resource>, 
+  test_message: String, 
 }
 
 // Define the default, which automatically initializes the contract
 impl Default for Contract{
   fn default() -> Self{
-    Self{
-      resources: LookupMap::new(b"r".to_vec())
+    Self {
+      resources: LookupMap::new(b"r".to_vec()), 
+      test_message: "it works!".into()
     }
   }
 }
@@ -86,6 +84,10 @@ impl Contract {
         });
       }
     }
+  }
+
+  pub fn get_test_message(&self) -> String {
+    return self.test_message.clone()
   }
 
   //TODO get resource - überhaupt nötig? weil eigentlich wollen wir ja über einen Indexer. 
