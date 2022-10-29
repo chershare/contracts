@@ -16,7 +16,7 @@ use near_sdk::collections::LookupMap;
 
 pub trait Pricing {
   fn get_price(&self, from: i64, until: i64) -> i128; 
-  fn get_refund(&self, from: i64, until: i64, now: i64) -> i128; 
+  fn get_refund_amount(&self, from: i64, until: i64, now: i64) -> i128; 
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -28,14 +28,45 @@ impl Pricing for SimpleRent {
   fn get_price(&self, from: i64, until:i64) -> i128 {
     return ((until - from) as i128) * self.price_per_ms; 
   }
-  fn get_refund(&self, from: i64, until:i64, _now: i64) -> i128 {
+  fn get_refund_amount(&self, from: i64, until:i64, _now: i64) -> i128 {
     return ((until - from) as i128) * self.price_per_ms; 
   }
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
+pub struct Rent {
+  price_fixed_base: i128,
+  price_per_ms: i128,
+  refund_buffer: i64,
+}
+
+impl Pricing for Rent {
+  fn get_price(&self, from: i64, until:i64) -> i128 {
+    return self.price_fixed_base + ((until - from) as i128) * self.price_per_ms; 
+  }
+  fn get_refund_amount(&self, from: i64, until:i64, now: i64) -> i128 {
+    let price_payed = self.get_price(from, until);
+    if now < from {
+      let distance = from - now; 
+      if distance < self.refund_buffer {
+        const PRECISION: i128 = 1000;
+        let squared_progress = i128::from(self.refund_buffer - distance).pow(2);
+        let squared_refund_buffer = i128::from(self.refund_buffer).pow(2);
+        let factor = PRECISION * (squared_refund_buffer - squared_progress) / squared_refund_buffer; 
+        price_payed * factor / PRECISION
+      } else {
+        price_payed
+      }
+    } else {
+      0 
+    }
+  } // fees will not be payed back due to technical reasons
+}
+
+
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct Resource {
-  name: String, 
+  title: String, 
   description: String, 
   pricing: SimpleRent 
 }
@@ -64,7 +95,7 @@ impl Contract {
   pub fn create_resource (
     &mut self, 
     id: String, 
-    name: String, 
+    title: String, 
     description: String, 
     price_per_ms: i128 
   ) {
@@ -75,7 +106,7 @@ impl Contract {
       None => {
         self.resources.insert(&id, {
           &Resource {
-            name, 
+            title, 
             description, 
             pricing: SimpleRent {
               price_per_ms
