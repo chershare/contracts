@@ -1,5 +1,5 @@
 [package]
-name = "factory"
+name = "chershare-factory"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-mintbase-deps = { path = "../mintbase-deps", features = ["factory-wasm"] }
+near-sdk = "4.0.0"
+serde_json = "1.0.87"
+serde = { version = "1", features = ["derive"] }
+chershare-resource = { path = "../resource" }

@@ -10,4 +10,4 @@ fi
 echo ">> Deploying contract"
 
 # https://docs.near.org/tools/near-cli#near-dev-deploy
-near dev-deploy --wasmFile ./target/wasm32-unknown-unknown/release/chershare.wasm # -f # for new contract id
+near dev-deploy --wasmFile ./target/wasm32-unknown-unknown/release/chershare-factory.wasm # -f # for new contract id

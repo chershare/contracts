@@ -6,13 +6,13 @@
  *
  */
 
+use near_sdk::serde::{
+    Deserialize,
+    Serialize,
+};
+
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::near_bindgen;
-
-use near_sdk::env::panic_str; 
-
-use near_sdk::collections::LookupMap;  
-
 
 pub trait Pricing {
   fn get_price(&self, from: i64, until: i64) -> i128; 
@@ -48,7 +48,7 @@ impl Pricing for Rent {
     let price_payed = self.get_price(from, until);
     if now < from {
       let distance = from - now; 
-      if distance < self.refund_buffer {
+      if distance < self.refund_buffer { // TODO: consider linear
         const PRECISION: i128 = 1000;
         let squared_progress = i128::from(self.refund_buffer - distance).pow(2);
         let squared_refund_buffer = i128::from(self.refund_buffer).pow(2);
@@ -63,62 +63,41 @@ impl Pricing for Rent {
   } // fees will not be payed back due to technical reasons
 }
 
-
+#[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Resource {
+  id: String, 
   title: String, 
   description: String, 
   pricing: SimpleRent 
 }
 
-// Define the contract structure
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct Contract {
-  resources: LookupMap<String, Resource>, 
-  test_message: String, 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(feature = "wasm", derive(BorshDeserialize, BorshSerialize))]
+pub struct ResourceInitParams {
+  pub id: String, 
+  pub title: String, 
+  pub description: String, 
+  pub price_per_ms: i128
 }
 
-// Define the default, which automatically initializes the contract
-impl Default for Contract{
-  fn default() -> Self{
-    Self {
-      resources: LookupMap::new(b"r".to_vec()), 
-      test_message: "it works!".into()
-    }
-  }
-}
-
-// Implement the contract structure
 #[near_bindgen]
-impl Contract {
-  pub fn create_resource (
-    &mut self, 
+impl Resource {
+  #[init]
+  fn new(
     id: String, 
     title: String, 
     description: String, 
     price_per_ms: i128 
-  ) {
-    match self.resources.get(&id) {
-      Some(..) => {
-        panic_str("A resource with this id already exists")
-      }, 
-      None => {
-        self.resources.insert(&id, {
-          &Resource {
-            title, 
-            description, 
-            pricing: SimpleRent {
-              price_per_ms
-            }
-          }
-        });
+  ) -> Self {
+    Self {
+      id, 
+      title, 
+      description, 
+      pricing: SimpleRent {
+        price_per_ms
       }
     }
-  }
-
-  pub fn get_test_message(&self) -> String {
-    return self.test_message.clone()
   }
 
   //TODO get resource - überhaupt nötig? weil eigentlich wollen wir ja über einen Indexer. 
