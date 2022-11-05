@@ -1,0 +1,4 @@
+cd factory
+./build.sh
+
+

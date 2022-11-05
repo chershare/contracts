@@ -1,0 +1,3 @@
+cd factory
+
+./deploy.sh
