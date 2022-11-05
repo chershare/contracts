@@ -69,7 +69,8 @@ pub struct Resource {
   id: String, 
   title: String, 
   description: String, 
-  pricing: SimpleRent 
+  pricing: SimpleRent, 
+  contact: String, 
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -78,7 +79,8 @@ pub struct ResourceInitParams {
   pub id: String, 
   pub title: String, 
   pub description: String, 
-  pub price_per_ms: i128
+  pub price_per_ms: i128, 
+  pub contact: String, 
 }
 
 #[near_bindgen]
@@ -88,7 +90,8 @@ impl Resource {
     id: String, 
     title: String, 
     description: String, 
-    price_per_ms: i128 
+    price_per_ms: i128, 
+    contact: String, 
   ) -> Self {
     Self {
       id, 
@@ -96,7 +99,8 @@ impl Resource {
       description, 
       pricing: SimpleRent {
         price_per_ms
-      }
+      }, 
+      contact, 
     }
   }
 

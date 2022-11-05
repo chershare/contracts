@@ -3,10 +3,9 @@
   "version": "1.0.0",
   "license": "(MIT AND Apache-2.0)",
   "scripts": {
-    "deploy": "cd contract && ./deploy.sh",
-    "build": "npm run build:contract",
+    "deploy": "cd factory && ./deploy.sh",
+    "build": "npm run buildall.sh",
     "build:factory": "cd factory && ./build.sh",
-    "build:contract": "cd contract && ./build.sh",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "cd contract && cargo test",
     "test:integration": "cd integration-tests && npm test -- -- \"./contract/target/wasm32-unknown-unknown/release/chershare.wasm\"",
