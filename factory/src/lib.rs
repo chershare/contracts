@@ -75,7 +75,7 @@ impl ChershareResourceFactory {
     self.assert_name_available(&name);
     // prepare arguments as json byte vector
     let init_args = format!(
-      "{{ \"resouce_init_params\": {} }}", 
+      "{{ \"init_params\": {} }}", 
       serde_json::ser::to_string(&resource_init_params).unwrap()
     ).as_bytes().to_vec();
     // ResourceId is only the subaccount. resource_account_id is the full near qualified name.

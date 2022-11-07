@@ -1,3 +1,4 @@
+use near_sdk::json_types::U128;
 use near_sdk::{env, PanicOnDefault};
 
 use near_sdk::collections::{
@@ -13,33 +14,58 @@ use near_sdk::serde::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::near_bindgen;
 
+#[derive(Deserialize, Serialize)]
+pub struct SimpleRentInitParams {
+  price_per_ms: U128
+}
 
-#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct SimpleRent {
   price_per_ms: u128
 }
 
 impl SimpleRent {
-  pub fn get_price(&self, from: i64, until:i64) -> u128 {
+  pub fn new(init_params: SimpleRentInitParams) -> Self {
+    return Self {
+      price_per_ms: init_params.price_per_ms.0
+    }
+  }
+
+  pub fn get_price(&self, from: u64, until:u64) -> u128 {
     return ((until - from) as u128) * self.price_per_ms; 
   }
-  pub fn get_refund_amount(&self, from: i64, until:i64, _now: i64) -> u128 {
+  pub fn get_refund_amount(&self, from: u64, until:u64, _now: u64) -> u128 {
     return ((until - from) as u128) * self.price_per_ms; 
   }
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
+pub struct LinearRefundInitParams {
+  price_fixed_base: U128,
+  price_per_ms: U128,
+  refund_buffer: u64,
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct LinearRefund {
   price_fixed_base: u128,
   price_per_ms: u128,
-  refund_buffer: i64,
+  refund_buffer: u64,
 }
 
 impl LinearRefund {
-  pub fn get_price(&self, from: i64, until:i64) -> u128 {
+  pub fn new(init_params: LinearRefundInitParams) -> Self {
+    return Self {
+      price_fixed_base: init_params.price_fixed_base.0, 
+      price_per_ms: init_params.price_per_ms.0, 
+      refund_buffer: init_params.refund_buffer
+    }
+  }
+
+  pub fn get_price(&self, from: u64, until:u64) -> u128 {
     return self.price_fixed_base + ((until - from) as u128) * self.price_per_ms; 
   }
-  pub fn get_refund_amount(&self, from: i64, until:i64, now: i64) -> u128 {
+  pub fn get_refund_amount(&self, from: u64, until:u64, now: u64) -> u128 {
     let price_payed = self.get_price(from, until);
     if now < from {
       let distance = from - now; 
@@ -54,29 +80,34 @@ impl LinearRefund {
   } // fees will not be payed back due to technical reasons
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize)]
+pub enum PricingEnumInitParams {
+  SimpleRent(SimpleRentInitParams), 
+  LinearRefund(LinearRefundInitParams), 
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
 pub enum PricingEnum {
   SimpleRent(SimpleRent), 
   LinearRefund(LinearRefund),
 }
 
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(feature = "wasm", derive(BorshDeserialize, BorshSerialize))]
 pub struct ResourceInitParams {
   pub title: String, 
   pub description: String, 
-  pub pricing: PricingEnum, 
+  pub pricing: PricingEnumInitParams, 
   pub contact: String, 
   pub coordinates: [f32; 2], 
-  pub min_duration_ms: i64,
+  pub min_duration_ms: u64,
   pub image_urls: Vec<String>, 
   pub tags: Vec<String>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Booking {
-  begin: i64, 
-  end: i64, 
+  begin: u64, 
+  end: u64, 
   consumer_account_id: String
 }
 
@@ -86,13 +117,13 @@ pub struct Resource {
   title: String, 
   description: String, 
   pricing: PricingEnum, 
-  min_duration_ms: i64, 
+  min_duration_ms: u64, 
   contact: String, 
   image_urls: LookupSet<String>, 
   tags: LookupSet<String>, 
   next_booking_id: u128,
-  blocker_beginnings: TreeMap<i64, u128>, 
-  blocker_ends: TreeMap<i64, u128>, 
+  blocker_beginnings: TreeMap<u64, u128>, 
+  blocker_ends: TreeMap<u64, u128>, 
   bookings: LookupMap<u128, Booking>, 
   coordinates: [f32; 2]
 }
@@ -102,35 +133,36 @@ impl Resource {
   #[init]
   #[allow(dead_code)]
   fn new(
-    title: String, 
-    description: String, 
-    pricing: PricingEnum, 
-    min_duration_ms: i64,
-    contact: String, 
-    image_urls: Vec<String>, 
-    tags: Vec<String>, 
-    coordinates: [f32; 2],
+    init_params: ResourceInitParams
   ) -> Self {
+    let pricing = match init_params.pricing {
+      PricingEnumInitParams::SimpleRent(ip) => {
+        PricingEnum::SimpleRent(SimpleRent::new(ip))
+      },
+      PricingEnumInitParams::LinearRefund(ip) => {
+        PricingEnum::LinearRefund(LinearRefund::new(ip))
+      }
+    };
     let mut new_resource = Self {
-      title, 
-      description, 
+      title: init_params.title, 
+      description: init_params.description, 
       pricing,
-      min_duration_ms, 
-      contact, 
+      min_duration_ms: init_params.min_duration_ms, 
+      contact: init_params.contact, 
       image_urls: LookupSet::new(b"i"), 
       tags: LookupSet::new(b"t"), 
       next_booking_id: 1, // 0 is reserved for resource owner blockers
       blocker_beginnings: TreeMap::new(b"b"), 
       blocker_ends: TreeMap::new(b"e"), 
       bookings: LookupMap::new(b"k"),
-      coordinates,
+      coordinates: init_params.coordinates,
     };
-    new_resource.image_urls.extend(image_urls);
-    new_resource.tags.extend(tags); 
+    new_resource.image_urls.extend(init_params.image_urls);
+    new_resource.tags.extend(init_params.tags); 
     new_resource
   }
 
-  pub fn assert_no_booking_collision(&self, begin: i64, end: i64) {
+  pub fn assert_no_booking_collision(&self, begin: u64, end: u64) {
     if let Some(booking_right_begin) = self.blocker_ends.higher(&begin) { // find out booking with the next end marker right of from
       if let Some(booking_right) = self.blocker_ends.get(&booking_right_begin) {
         if let Some(booking) = self.bookings.get(&booking_right) {
@@ -154,7 +186,7 @@ impl Resource {
   }
 
   #[payable]
-  pub fn book(&mut self, begin: i64, end: i64) {
+  pub fn book(&mut self, begin: u64, end: u64) {
     assert!(end > begin, "end before begin"); 
     let duration = end - begin;
     assert!(duration >= self.min_duration_ms);
