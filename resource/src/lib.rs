@@ -1,3 +1,10 @@
+use near_sdk::{env, PanicOnDefault};
+
+use near_sdk::collections::{
+  LookupSet, 
+  TreeMap, 
+  LookupMap 
+};
 use near_sdk::serde::{
     Deserialize,
     Serialize,
@@ -6,21 +13,17 @@ use near_sdk::serde::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::near_bindgen;
 
-pub trait Pricing {
-  fn get_price(&self, from: i64, until: i64) -> u128; 
-  fn get_refund_amount(&self, from: i64, until: i64, now: i64) -> u128; 
-}
 
 #[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize)]
 pub struct SimpleRent {
   price_per_ms: u128
 }
 
-impl Pricing for SimpleRent {
-  fn get_price(&self, from: i64, until:i64) -> u128 {
+impl SimpleRent {
+  pub fn get_price(&self, from: i64, until:i64) -> u128 {
     return ((until - from) as u128) * self.price_per_ms; 
   }
-  fn get_refund_amount(&self, from: i64, until:i64, _now: i64) -> u128 {
+  pub fn get_refund_amount(&self, from: i64, until:i64, _now: i64) -> u128 {
     return ((until - from) as u128) * self.price_per_ms; 
   }
 }
@@ -32,11 +35,11 @@ pub struct LinearRefund {
   refund_buffer: i64,
 }
 
-impl Pricing for LinearRefund {
-  fn get_price(&self, from: i64, until:i64) -> u128 {
+impl LinearRefund {
+  pub fn get_price(&self, from: i64, until:i64) -> u128 {
     return self.price_fixed_base + ((until - from) as u128) * self.price_per_ms; 
   }
-  fn get_refund_amount(&self, from: i64, until:i64, now: i64) -> u128 {
+  pub fn get_refund_amount(&self, from: i64, until:i64, now: i64) -> u128 {
     let price_payed = self.get_price(from, until);
     if now < from {
       let distance = from - now; 
@@ -64,15 +67,34 @@ pub struct ResourceInitParams {
   pub description: String, 
   pub pricing: PricingEnum, 
   pub contact: String, 
+  pub coordinates: [f32; 2], 
+  pub min_duration_ms: i64,
+  pub image_urls: Vec<String>, 
+  pub tags: Vec<String>,
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct Booking {
+  begin: i64, 
+  end: i64, 
+  consumer_account_id: String
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Resource {
   title: String, 
   description: String, 
   pricing: PricingEnum, 
+  min_duration_ms: i64, 
   contact: String, 
+  image_urls: LookupSet<String>, 
+  tags: LookupSet<String>, 
+  next_booking_id: u128,
+  blocker_beginnings: TreeMap<i64, u128>, 
+  blocker_ends: TreeMap<i64, u128>, 
+  bookings: LookupMap<u128, Booking>, 
+  coordinates: [f32; 2]
 }
 
 #[near_bindgen]
@@ -83,15 +105,88 @@ impl Resource {
     title: String, 
     description: String, 
     pricing: PricingEnum, 
+    min_duration_ms: i64,
     contact: String, 
+    image_urls: Vec<String>, 
+    tags: Vec<String>, 
+    coordinates: [f32; 2],
   ) -> Self {
-    Self {
+    let mut new_resource = Self {
       title, 
       description, 
       pricing,
+      min_duration_ms, 
       contact, 
+      image_urls: LookupSet::new(b"i"), 
+      tags: LookupSet::new(b"t"), 
+      next_booking_id: 1, // 0 is reserved for resource owner blockers
+      blocker_beginnings: TreeMap::new(b"b"), 
+      blocker_ends: TreeMap::new(b"e"), 
+      bookings: LookupMap::new(b"k"),
+      coordinates,
+    };
+    new_resource.image_urls.extend(image_urls);
+    new_resource.tags.extend(tags); 
+    new_resource
+  }
+
+  pub fn assert_no_booking_collision(&self, begin: i64, end: i64) {
+    if let Some(booking_right_begin) = self.blocker_ends.higher(&begin) { // find out booking with the next end marker right of from
+      if let Some(booking_right) = self.blocker_ends.get(&booking_right_begin) {
+        if let Some(booking) = self.bookings.get(&booking_right) {
+          assert!( // check that that one's start is after this ones end
+            booking.begin > end, 
+            "booking collision"
+          );
+        }
+      }
+    }
+    if let Some(booking_left_begin) = self.blocker_beginnings.lower(&end) {
+      if let Some(booking_left) = self.blocker_beginnings.get(&booking_left_begin) {
+        if let Some(booking) = self.bookings.get(&booking_left) {
+          assert!(
+            booking.end < begin,
+            "booking collision"
+          );
+        }
+      }
     }
   }
+
+  #[payable]
+  pub fn book(&mut self, begin: i64, end: i64) {
+    assert!(end > begin, "end before begin"); 
+    let duration = end - begin;
+    assert!(duration >= self.min_duration_ms);
+    self.assert_no_booking_collision(begin, end); 
+    let price = match &self.pricing {
+      PricingEnum::SimpleRent(sr) => {
+        sr.get_price(begin, end)
+      }, 
+      PricingEnum::LinearRefund(sr) => {
+        sr.get_price(begin, end)
+      }
+    }; 
+    assert!(
+        env::attached_deposit() >= price,
+        "price: {}, sent: {}",
+        price,
+        env::attached_deposit()
+    );
+    let booking_id = self.next_booking_id; 
+    self.next_booking_id += 1; 
+    let booking = Booking {
+      begin, 
+      end, 
+      consumer_account_id: env::signer_account_id().to_string()
+    }; 
+    self.bookings.insert(&booking_id, &booking);
+    self.blocker_beginnings.insert(&begin, &booking_id);
+    self.blocker_ends.insert(&end, &booking_id); 
+    // from the start, find the next end
+  }
+
+  //TODO fn replace_booking for changes to the booking - such that noone can interfere
 
   //TODO get resource - überhaupt nötig? weil eigentlich wollen wir ja über einen Indexer. 
 
