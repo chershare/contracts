@@ -89,7 +89,7 @@ impl ChershareResourceFactory {
       .transfer(env::attached_deposit()) 
       .add_full_access_key(env::signer_account_pk()) // TODO maybe use predecessor_account_key instead - but not sure how
       .deploy_contract(include_bytes!("../../target/wasm32-unknown-unknown/release/chershare_resource.wasm").to_vec())
-      .function_call("new".to_string(), init_args, 0, CREATE_RESOURCE_GAS)
+      .function_call("init".to_string(), init_args, 0, CREATE_RESOURCE_GAS)
       .then(
         Self::ext(env::current_account_id())
           .with_static_gas(tgas(10))

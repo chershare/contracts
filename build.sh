@@ -1,4 +1,4 @@
-cd factory
+cd resource 
 ./build.sh
 
 

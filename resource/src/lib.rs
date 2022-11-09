@@ -1,5 +1,5 @@
 use near_sdk::json_types::U128;
-use near_sdk::{env, PanicOnDefault};
+use near_sdk::env;
 
 use near_sdk::collections::{
   LookupSet, 
@@ -112,7 +112,7 @@ pub struct Booking {
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(BorshDeserialize, BorshSerialize)]
 pub struct Resource {
   title: String, 
   description: String, 
@@ -125,17 +125,36 @@ pub struct Resource {
   blocker_beginnings: TreeMap<u64, u128>, 
   blocker_ends: TreeMap<u64, u128>, 
   bookings: LookupMap<u128, Booking>, 
-  coordinates: [f32; 2]
+  coordinates: [f32; 2], 
+}
+
+impl Default for Resource {
+  fn default() -> Self {
+      Self {
+        title: "".into(), 
+        description: "".into(), 
+        pricing: PricingEnum::SimpleRent( SimpleRent {
+          price_per_ms: 0
+        }), 
+        contact: "".into(), 
+        image_urls: LookupSet::new(b"i"), 
+        tags: LookupSet::new(b"t"), 
+        blocker_beginnings: TreeMap::new(b"b"), 
+        blocker_ends: TreeMap::new(b"e"), 
+        bookings: LookupMap::new(b"k"),
+        coordinates: [0., 0.], 
+        min_duration_ms: 0, 
+        next_booking_id: 0
+      }
+  }
 }
 
 #[near_bindgen]
 impl Resource {
-  #[init]
-  #[allow(dead_code)]
-  fn new(
-    init_params: ResourceInitParams
-  ) -> Self {
-    let pricing = match init_params.pricing {
+  //TODO maybe make sure a resource can only be initialized once
+  // maybe use #[init] instead of Default implementation
+  pub fn init(&mut self, init_params: ResourceInitParams) -> String {
+    self.pricing = match init_params.pricing {
       PricingEnumInitParams::SimpleRent(ip) => {
         PricingEnum::SimpleRent(SimpleRent::new(ip))
       },
@@ -143,23 +162,21 @@ impl Resource {
         PricingEnum::LinearRefund(LinearRefund::new(ip))
       }
     };
-    let mut new_resource = Self {
-      title: init_params.title, 
-      description: init_params.description, 
-      pricing,
-      min_duration_ms: init_params.min_duration_ms, 
-      contact: init_params.contact, 
-      image_urls: LookupSet::new(b"i"), 
-      tags: LookupSet::new(b"t"), 
-      next_booking_id: 1, // 0 is reserved for resource owner blockers
-      blocker_beginnings: TreeMap::new(b"b"), 
-      blocker_ends: TreeMap::new(b"e"), 
-      bookings: LookupMap::new(b"k"),
-      coordinates: init_params.coordinates,
-    };
-    new_resource.image_urls.extend(init_params.image_urls);
-    new_resource.tags.extend(init_params.tags); 
-    new_resource
+
+    self.title = init_params.title; 
+    self.description = init_params.description; 
+    self.min_duration_ms = init_params.min_duration_ms; 
+    self.contact = init_params.contact; 
+    self.coordinates = init_params.coordinates; 
+
+    self.image_urls.extend(init_params.image_urls);
+    self.tags.extend(init_params.tags); 
+
+    "resource initialized".into()
+  }
+
+  pub fn test() -> String {
+    return "hi, cool!".into(); 
   }
 
   pub fn assert_no_booking_collision(&self, begin: u64, end: u64) {
