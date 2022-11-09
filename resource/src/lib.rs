@@ -1,5 +1,5 @@
 use near_sdk::json_types::U128;
-use near_sdk::env;
+use near_sdk::{env, PanicOnDefault};
 
 use near_sdk::collections::{
   LookupSet, 
@@ -112,7 +112,7 @@ pub struct Booking {
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Resource {
   title: String, 
   description: String, 
@@ -128,33 +128,13 @@ pub struct Resource {
   coordinates: [f32; 2], 
 }
 
-impl Default for Resource {
-  fn default() -> Self {
-      Self {
-        title: "".into(), 
-        description: "".into(), 
-        pricing: PricingEnum::SimpleRent( SimpleRent {
-          price_per_ms: 0
-        }), 
-        contact: "".into(), 
-        image_urls: LookupSet::new(b"i"), 
-        tags: LookupSet::new(b"t"), 
-        blocker_beginnings: TreeMap::new(b"b"), 
-        blocker_ends: TreeMap::new(b"e"), 
-        bookings: LookupMap::new(b"k"),
-        coordinates: [0., 0.], 
-        min_duration_ms: 0, 
-        next_booking_id: 0
-      }
-  }
-}
-
 #[near_bindgen]
 impl Resource {
   //TODO maybe make sure a resource can only be initialized once
   // maybe use #[init] instead of Default implementation
-  pub fn init(&mut self, init_params: ResourceInitParams) -> String {
-    self.pricing = match init_params.pricing {
+  #[init]
+  pub fn init(init_params: ResourceInitParams) -> Self {
+    let pricing = match init_params.pricing {
       PricingEnumInitParams::SimpleRent(ip) => {
         PricingEnum::SimpleRent(SimpleRent::new(ip))
       },
@@ -162,17 +142,23 @@ impl Resource {
         PricingEnum::LinearRefund(LinearRefund::new(ip))
       }
     };
-
-    self.title = init_params.title; 
-    self.description = init_params.description; 
-    self.min_duration_ms = init_params.min_duration_ms; 
-    self.contact = init_params.contact; 
-    self.coordinates = init_params.coordinates; 
-
-    self.image_urls.extend(init_params.image_urls);
-    self.tags.extend(init_params.tags); 
-
-    "resource initialized".into()
+    let mut resource = Self {
+      title: init_params.title, 
+      description: init_params.description, 
+      pricing, 
+      contact: init_params.contact, 
+      image_urls: LookupSet::new(b"i"), 
+      tags: LookupSet::new(b"t"), 
+      blocker_beginnings: TreeMap::new(b"b"), 
+      blocker_ends: TreeMap::new(b"e"), 
+      bookings: LookupMap::new(b"k"),
+      coordinates: init_params.coordinates, 
+      min_duration_ms: init_params.min_duration_ms, 
+      next_booking_id: 0
+    };
+    resource.image_urls.extend(init_params.image_urls);
+    resource.tags.extend(init_params.tags); 
+    resource
   }
 
   pub fn test() -> String {

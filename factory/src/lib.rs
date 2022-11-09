@@ -100,7 +100,7 @@ impl ChershareResourceFactory {
   #[private] 
   pub fn create_resource_callback(
     &mut self, 
-    #[callback_result] call_result: Result<String, PromiseError>) -> () {
+    #[callback_result] call_result: Result<(), PromiseError>) -> () {
       match call_result {
         Ok(_string) => {
           self.resources.insert(&env::signer_account_id().to_string());
