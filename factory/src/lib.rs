@@ -93,17 +93,19 @@ impl ChershareResourceFactory {
       .then(
         Self::ext(env::current_account_id())
           .with_static_gas(tgas(10))
-          .create_resource_callback()
+          .create_resource_callback(name)
       )
   }
 
   #[private] 
   pub fn create_resource_callback(
     &mut self, 
+    name: String,
     #[callback_result] call_result: Result<(), PromiseError>) -> () {
       match call_result {
+        // TODO: indexer should only record succesful resource creations
         Ok(_string) => {
-          self.resources.insert(&env::signer_account_id().to_string());
+          self.resources.insert(&name);// &env::signer_account_id().to_string());
         }, 
         Err(_err) => {
         }

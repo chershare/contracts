@@ -15,46 +15,21 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::near_bindgen;
 
 #[derive(Deserialize, Serialize)]
-pub struct SimpleRentInitParams {
-  price_per_ms: U128
-}
-
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct SimpleRent {
-  price_per_ms: u128
-}
-
-impl SimpleRent {
-  pub fn new(init_params: SimpleRentInitParams) -> Self {
-    return Self {
-      price_per_ms: init_params.price_per_ms.0
-    }
-  }
-
-  pub fn get_price(&self, from: u64, until:u64) -> u128 {
-    return ((until - from) as u128) * self.price_per_ms; 
-  }
-  pub fn get_refund_amount(&self, from: u64, until:u64, _now: u64) -> u128 {
-    return ((until - from) as u128) * self.price_per_ms; 
-  }
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct LinearRefundInitParams {
+pub struct PricingParams {
   price_fixed_base: U128,
   price_per_ms: U128,
   refund_buffer: u64,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
-pub struct LinearRefund {
+pub struct Pricing {
   price_fixed_base: u128,
   price_per_ms: u128,
   refund_buffer: u64,
 }
 
-impl LinearRefund {
-  pub fn new(init_params: LinearRefundInitParams) -> Self {
+impl Pricing {
+  pub fn new(init_params: PricingParams) -> Self {
     return Self {
       price_fixed_base: init_params.price_fixed_base.0, 
       price_per_ms: init_params.price_per_ms.0, 
@@ -81,27 +56,15 @@ impl LinearRefund {
 }
 
 #[derive(Deserialize, Serialize)]
-pub enum PricingEnumInitParams {
-  SimpleRent(SimpleRentInitParams), 
-  LinearRefund(LinearRefundInitParams), 
-}
-
-#[derive(BorshDeserialize, BorshSerialize)]
-pub enum PricingEnum {
-  SimpleRent(SimpleRent), 
-  LinearRefund(LinearRefund),
-}
-
-#[derive(Deserialize, Serialize)]
 pub struct ResourceInitParams {
   pub title: String, 
   pub description: String, 
-  pub pricing: PricingEnumInitParams, 
+  pub image_urls: Vec<String>, 
   pub contact: String, 
+  pub tags: Vec<String>,
+  pub pricing: PricingParams,  
   pub coordinates: [f32; 2], 
   pub min_duration_ms: u64,
-  pub image_urls: Vec<String>, 
-  pub tags: Vec<String>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -116,7 +79,7 @@ pub struct Booking {
 pub struct Resource {
   title: String, 
   description: String, 
-  pricing: PricingEnum, 
+  pricing: Pricing, 
   min_duration_ms: u64, 
   contact: String, 
   image_urls: LookupSet<String>, 
@@ -132,14 +95,7 @@ pub struct Resource {
 impl Resource {
   #[init]
   pub fn init(init_params: ResourceInitParams) -> Self {
-    let pricing = match init_params.pricing {
-      PricingEnumInitParams::SimpleRent(ip) => {
-        PricingEnum::SimpleRent(SimpleRent::new(ip))
-      },
-      PricingEnumInitParams::LinearRefund(ip) => {
-        PricingEnum::LinearRefund(LinearRefund::new(ip))
-      }
-    };
+    let pricing = Pricing::new(init_params.pricing);
     let mut resource = Self {
       title: init_params.title, 
       description: init_params.description, 
@@ -192,14 +148,7 @@ impl Resource {
     let duration = end - begin;
     assert!(duration >= self.min_duration_ms);
     self.assert_no_booking_collision(begin, end); 
-    let price = match &self.pricing {
-      PricingEnum::SimpleRent(sr) => {
-        sr.get_price(begin, end)
-      }, 
-      PricingEnum::LinearRefund(sr) => {
-        sr.get_price(begin, end)
-      }
-    }; 
+    let price = self.pricing.get_price(begin, end);
     assert!(
         env::attached_deposit() >= price,
         "price: {}, sent: {}",
