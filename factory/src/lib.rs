@@ -66,6 +66,10 @@ impl ChershareResourceFactory {
     self.test_msg.clone()
   }
 
+  pub fn name_exists(&self, name: String) -> bool {
+    self.resources.contains(&name)
+  }
+
   #[payable]
   pub fn create_resource(
     &mut self,

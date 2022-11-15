@@ -16,9 +16,9 @@ use near_sdk::near_bindgen;
 
 #[derive(Deserialize, Serialize)]
 pub struct PricingParams {
-  price_fixed_base: U128,
   price_per_ms: U128,
-  refund_buffer: u64,
+  price_per_booking: U128,
+  full_refund_period_ms: u64,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -31,9 +31,9 @@ pub struct Pricing {
 impl Pricing {
   pub fn new(init_params: PricingParams) -> Self {
     return Self {
-      price_fixed_base: init_params.price_fixed_base.0, 
+      price_fixed_base: init_params.price_per_booking.0, 
       price_per_ms: init_params.price_per_ms.0, 
-      refund_buffer: init_params.refund_buffer
+      refund_buffer: init_params.full_refund_period_ms
     }
   }
 
@@ -166,6 +166,10 @@ impl Resource {
     self.blocker_beginnings.insert(&begin, &booking_id);
     self.blocker_ends.insert(&end, &booking_id); 
     // from the start, find the next end
+  }
+
+  pub fn get_quote(&self, start: u64, end: u64) -> U128 {
+    U128::from(self.pricing.get_price(start, end))
   }
 
   //TODO fn replace_booking for changes to the booking - such that noone can interfere
