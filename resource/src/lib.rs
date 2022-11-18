@@ -69,7 +69,7 @@ pub struct ResourceInitParams {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Booking {
-  begin: u64, 
+  start: u64, 
   end: u64, 
   consumer_account_id: String
 }
@@ -85,7 +85,7 @@ pub struct Resource {
   image_urls: LookupSet<String>, 
   tags: LookupSet<String>, 
   next_booking_id: u128,
-  blocker_beginnings: TreeMap<u64, u128>, 
+  blocker_starts: TreeMap<u64, u128>, 
   blocker_ends: TreeMap<u64, u128>, 
   bookings: LookupMap<u128, Booking>, 
   coordinates: [f32; 2], 
@@ -103,7 +103,7 @@ impl Resource {
       contact: init_params.contact, 
       image_urls: LookupSet::new(b"i"), 
       tags: LookupSet::new(b"t"), 
-      blocker_beginnings: TreeMap::new(b"b"), 
+      blocker_starts: TreeMap::new(b"b"), 
       blocker_ends: TreeMap::new(b"e"), 
       bookings: LookupMap::new(b"k"),
       coordinates: init_params.coordinates, 
@@ -119,22 +119,22 @@ impl Resource {
     return "hi, cool!".into(); 
   }
 
-  pub fn assert_no_booking_collision(&self, begin: u64, end: u64) {
-    if let Some(booking_right_begin) = self.blocker_ends.higher(&begin) { // find out booking with the next end marker right of from
-      if let Some(booking_right) = self.blocker_ends.get(&booking_right_begin) {
+  pub fn assert_no_booking_collision(&self, start: u64, end: u64) {
+    if let Some(booking_right_start) = self.blocker_ends.higher(&start) { // find out booking with the next end marker right of from
+      if let Some(booking_right) = self.blocker_ends.get(&booking_right_start) {
         if let Some(booking) = self.bookings.get(&booking_right) {
           assert!( // check that that one's start is after this ones end
-            booking.begin > end, 
+            booking.start > end, 
             "booking collision"
           );
         }
       }
     }
-    if let Some(booking_left_begin) = self.blocker_beginnings.lower(&end) {
-      if let Some(booking_left) = self.blocker_beginnings.get(&booking_left_begin) {
+    if let Some(booking_left_start) = self.blocker_starts.lower(&end) {
+      if let Some(booking_left) = self.blocker_starts.get(&booking_left_start) {
         if let Some(booking) = self.bookings.get(&booking_left) {
           assert!(
-            booking.end < begin,
+            booking.end < start,
             "booking collision"
           );
         }
@@ -143,12 +143,12 @@ impl Resource {
   }
 
   #[payable]
-  pub fn book(&mut self, begin: u64, end: u64) {
-    assert!(end > begin, "end before begin"); 
-    let duration = end - begin;
+  pub fn book(&mut self, start: u64, end: u64) {
+    assert!(end > start, "end before start"); 
+    let duration = end - start;
     assert!(duration >= self.min_duration_ms);
-    self.assert_no_booking_collision(begin, end); 
-    let price = self.pricing.get_price(begin, end);
+    self.assert_no_booking_collision(start, end); 
+    let price = self.pricing.get_price(start, end);
     assert!(
         env::attached_deposit() >= price,
         "price: {}, sent: {}",
@@ -158,12 +158,12 @@ impl Resource {
     let booking_id = self.next_booking_id; 
     self.next_booking_id += 1; 
     let booking = Booking {
-      begin, 
+      start, 
       end, 
       consumer_account_id: env::signer_account_id().to_string()
     }; 
     self.bookings.insert(&booking_id, &booking);
-    self.blocker_beginnings.insert(&begin, &booking_id);
+    self.blocker_starts.insert(&start, &booking_id);
     self.blocker_ends.insert(&end, &booking_id); 
     // from the start, find the next end
   }
