@@ -17,6 +17,7 @@ use near_sdk::{
 };
 
 use chershare_resource::ResourceInitParams;
+use serde::{Deserialize, Serialize};
 
 // Constants
 
@@ -41,6 +42,17 @@ impl Default for ChershareResourceFactory {
       test_msg: "hi!".into(), 
     }
   }
+}
+
+#[derive(Deserialize, Serialize)]
+struct ResourceInitParamsCallWrapper {
+  init_params: ResourceInitParams
+}
+
+#[derive(Deserialize, Serialize)]
+struct ResourceCreationLog {
+  name: String, 
+  init_params: ResourceInitParams
 }
 
 #[near_bindgen]
@@ -77,13 +89,13 @@ impl ChershareResourceFactory {
     resource_init_params: ResourceInitParams 
   ) -> Promise {
     self.assert_name_available(&name);
-    // prepare arguments as json byte vector
-    let init_args = format!(
-      "{{ \"init_params\": {} }}", 
-      serde_json::ser::to_string(&resource_init_params).unwrap()
-    ).as_bytes().to_vec();
-    // ResourceId is only the subaccount. resource_account_id is the full near qualified name.
 
+    // prepare arguments as json byte vector
+    let init_args = serde_json::ser::to_string(&ResourceInitParamsCallWrapper {
+        init_params: resource_init_params.clone()
+    }).unwrap().as_bytes().to_vec();
+
+    // ResourceId is only the subaccount. resource_account_id is the full near qualified name.
     let resource_account_id =
       AccountId::from_str(&*format!("{}.{}", name, env::current_account_id()))
         .unwrap();
@@ -97,7 +109,7 @@ impl ChershareResourceFactory {
       .then(
         Self::ext(env::current_account_id())
           .with_static_gas(tgas(10))
-          .create_resource_callback(name)
+          .create_resource_callback(name, resource_init_params)
       )
   }
 
@@ -105,11 +117,18 @@ impl ChershareResourceFactory {
   pub fn create_resource_callback(
     &mut self, 
     name: String,
+    init_params: ResourceInitParams, 
     #[callback_result] call_result: Result<(), PromiseError>) -> () {
       match call_result {
         // TODO: indexer should only record succesful resource creations
         Ok(_string) => {
           self.resources.insert(&name);// &env::signer_account_id().to_string());
+          env::log_str(
+            &*format!("ResourceCreation: {}", serde_json::ser::to_string(&ResourceCreationLog {
+              name, 
+              init_params, 
+            }).unwrap())
+          ); 
         }, 
         Err(_err) => {
         }

@@ -15,6 +15,15 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::near_bindgen;
 
 #[derive(Deserialize, Serialize)]
+struct BookingCreationLog {
+  id: U128,
+  booker_account_id: String, 
+  start: u64, 
+  end: u64, 
+  price: U128
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub struct PricingParams {
   price_per_ms: U128,
   price_per_booking: U128,
@@ -55,7 +64,7 @@ impl Pricing {
   } // fees will not be payed back due to technical reasons
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct ResourceInitParams {
   pub title: String, 
   pub description: String, 
@@ -165,29 +174,20 @@ impl Resource {
     self.bookings.insert(&booking_id, &booking);
     self.blocker_starts.insert(&start, &booking_id);
     self.blocker_ends.insert(&end, &booking_id); 
+
+    env::log_str(&*format!("BookingCreation: {}", serde_json::ser::to_string(&BookingCreationLog {
+      id: U128::from(booking_id),
+      booker_account_id: booking.consumer_account_id, 
+      start: booking.start, 
+      end: booking.end, 
+      price: U128::from(price) 
+    }).unwrap())); 
     // from the start, find the next end
   }
 
   pub fn get_quote(&self, start: u64, end: u64) -> U128 {
     U128::from(self.pricing.get_price(start, end))
   }
-
-  //TODO fn replace_booking for changes to the booking - such that noone can interfere
-
-  //TODO get resource - überhaupt nötig? weil eigentlich wollen wir ja über einen Indexer. 
-
-  // Example Methods
-  // // Public method - returns the greeting saved, defaulting to DEFAULT_MESSAGE
-  // pub fn get_greeting(&self) -> String {
-  //     return self.message.clone();
-  // }
-
-  // // Public method - accepts a greeting, such as "howdy", and records it
-  // pub fn set_greeting(&mut self, message: String) {
-  //     // Use env::log to record logs permanently to the blockchain!
-  //     log!("Saving greeting {}", message);
-  //     self.message = message;
-  // }
 }
 
 /*
