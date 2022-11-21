@@ -46,13 +46,15 @@ impl Default for ChershareResourceFactory {
 
 #[derive(Deserialize, Serialize)]
 struct ResourceInitParamsCallWrapper {
+  owner: String, 
   init_params: ResourceInitParams
 }
 
 #[derive(Deserialize, Serialize)]
 struct ResourceCreationLog {
   name: String, 
-  init_params: ResourceInitParams
+  owner: String, 
+  init_params: ResourceInitParams, 
 }
 
 #[near_bindgen]
@@ -90,9 +92,12 @@ impl ChershareResourceFactory {
   ) -> Promise {
     self.assert_name_available(&name);
 
+    let resource_owner = env::signer_account_id(); 
+
     // prepare arguments as json byte vector
     let init_args = serde_json::ser::to_string(&ResourceInitParamsCallWrapper {
-        init_params: resource_init_params.clone()
+      owner: resource_owner.to_string(), 
+      init_params: resource_init_params.clone(), 
     }).unwrap().as_bytes().to_vec();
 
     // ResourceId is only the subaccount. resource_account_id is the full near qualified name.
@@ -109,7 +114,7 @@ impl ChershareResourceFactory {
       .then(
         Self::ext(env::current_account_id())
           .with_static_gas(tgas(10))
-          .create_resource_callback(name, resource_init_params)
+          .create_resource_callback(name, resource_owner.to_string(), resource_init_params)
       )
   }
 
@@ -117,6 +122,7 @@ impl ChershareResourceFactory {
   pub fn create_resource_callback(
     &mut self, 
     name: String,
+    owner: String, 
     init_params: ResourceInitParams, 
     #[callback_result] call_result: Result<(), PromiseError>) -> () {
       match call_result {
@@ -126,6 +132,7 @@ impl ChershareResourceFactory {
           env::log_str(
             &*format!("ResourceCreation: {}", serde_json::ser::to_string(&ResourceCreationLog {
               name, 
+              owner, 
               init_params, 
             }).unwrap())
           ); 

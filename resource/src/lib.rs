@@ -23,6 +23,12 @@ struct BookingCreationLog {
   price: U128
 }
 
+#[derive(Deserialize, Serialize)]
+struct BookingCancellationLog {
+  id: U128, 
+  refund_amount: U128
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct PricingParams {
   price_per_ms: U128,
@@ -78,14 +84,16 @@ pub struct ResourceInitParams {
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Booking {
+  consumer_account_id: String,
   start: u64, 
   end: u64, 
-  consumer_account_id: String
+  price: u128, 
 }
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Resource {
+  owner: String, 
   title: String, 
   description: String, 
   pricing: Pricing, 
@@ -103,9 +111,13 @@ pub struct Resource {
 #[near_bindgen]
 impl Resource {
   #[init]
-  pub fn init(init_params: ResourceInitParams) -> Self {
+  pub fn init(
+    owner: String, 
+    init_params: ResourceInitParams
+  ) -> Self {
     let pricing = Pricing::new(init_params.pricing);
     let mut resource = Self {
+      owner, 
       title: init_params.title, 
       description: init_params.description, 
       pricing, 
@@ -167,9 +179,10 @@ impl Resource {
     let booking_id = self.next_booking_id; 
     self.next_booking_id += 1; 
     let booking = Booking {
+      consumer_account_id: env::signer_account_id().to_string(), 
       start, 
       end, 
-      consumer_account_id: env::signer_account_id().to_string()
+      price
     }; 
     self.bookings.insert(&booking_id, &booking);
     self.blocker_starts.insert(&start, &booking_id);
@@ -180,9 +193,25 @@ impl Resource {
       booker_account_id: booking.consumer_account_id, 
       start: booking.start, 
       end: booking.end, 
-      price: U128::from(price) 
+      price: U128::from(price), 
     }).unwrap())); 
     // from the start, find the next end
+  }
+
+  pub fn cancel_booking(&mut self, booking_id: u128) {
+    let booking = self.bookings.get(&booking_id).unwrap(); 
+    assert!(
+      booking.consumer_account_id.eq(&env::signer_account_id().to_string()), 
+      "not your booking"
+    ); 
+    self.bookings.remove(&booking_id).unwrap(); 
+    let ms = env::block_timestamp() / 1_000_000; 
+    let refund_amount = self.pricing.get_refund_amount(booking.start, booking.end, ms);  
+    env::log_str(&*format!("BookingCancellation: {}", serde_json::ser::to_string(&BookingCancellationLog {
+      id: U128::from(booking_id), 
+      refund_amount: U128::from(refund_amount) 
+    }).unwrap())); 
+    near_sdk::Promise::new(booking.consumer_account_id.to_string().parse().unwrap()).transfer(refund_amount);
   }
 
   pub fn get_quote(&self, start: u64, end: u64) -> U128 {
